@@ -7,7 +7,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import routes_meta
+from app.api import routes_meta, routes_products
 from app.config.settings import get_settings
 
 logging.basicConfig(
@@ -36,6 +36,7 @@ app.add_middleware(
 )
 
 app.include_router(routes_meta.router, prefix="/api")
+app.include_router(routes_products.router, prefix="/api")
 
 
 @app.get("/api/health")
