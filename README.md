@@ -81,11 +81,26 @@ ever committed.
 | `IMAGE_PROVIDER` | `gemini` | `gemini` (live) or `dryrun` (free placeholders) |
 | `BUDGET_CAP_INR_PER_PRODUCT` | `100` | Hard stop before exceeding; editable in Settings |
 | `USD_TO_INR` | `88.0` | Conversion used for the cap |
-| `REMBG_MODEL` | `birefnet-general` | Cut-out model; `u2netp` is faster, rougher |
+| `REMBG_MODEL` | `birefnet-general` | Cut-out model; `u2netp` is far smaller and faster, but rougher on chains |
 | `BACKEND_PORT` / `FRONTEND_PORT` | `8000` / `5173` | |
 
 If `GOOGLE_API_KEY` is missing, the app **falls back to dry-run** rather than crashing —
 you can still explore the UI and the export pipeline.
+
+### First cut-out downloads a large model
+
+The first time you remove a background, `rembg` fetches the BiRefNet weights —
+**~970 MB**, several minutes — into `%USERPROFILE%\.u2net\`. It is cached afterwards.
+Progress goes to the backend console only, so the UI just shows "Working…".
+
+If the download is interrupted it does **not** resume; it leaves a `tmp*` file in that
+folder. Delete it and try again:
+
+```powershell
+Remove-Item "$env:USERPROFILE\.u2net\tmp*" -Force
+```
+
+Set `REMBG_MODEL=u2netp` for a much smaller, faster model if you are only smoke-testing.
 
 ---
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api.js'
 import AngleSlots from './AngleSlots.jsx'
+import CutoutPanel from './CutoutPanel.jsx'
 import DimensionFields from './DimensionFields.jsx'
 import { Button, ErrorNote, Field, Input, Panel, Select, Textarea } from './ui.jsx'
 
@@ -190,6 +191,8 @@ export default function ProductEditor({ productId, onDone, onCancel }) {
           onUploaded={setProduct}
         />
       </Panel>
+
+      <CutoutPanel product={product} />
 
       {blockers.length > 0 && (
         <div className="rounded border border-amber-400/40 bg-amber-950/25 px-4 py-3 text-sm text-amber-200">

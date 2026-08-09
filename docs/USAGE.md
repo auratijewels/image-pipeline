@@ -67,17 +67,42 @@ Five labelled drop slots: **front**, **back**, **left**, **right**, **extra**.
 
 ---
 
-## 3. Generate
+## 3. Check the cut-outs
+
+Save the product, then hit **Remove backgrounds** in the Cut-outs panel.
+
+Each uploaded angle becomes a transparent PNG, shown on a checkerboard so you can
+actually see the alpha channel — on a flat background a bad matte looks identical to a
+good one.
+
+**Judge them on the hard parts, not the easy ones.** A solid pendant against seamless
+white always cuts out cleanly and tells you nothing. What to look at:
+
+- **chains** — thin strands are the first thing to break into dashes
+- **prong and claw settings** — small gaps the matte tends to fill in solid
+- **polished metal edges** — reflections pull the boundary outward into a halo
+
+Each tile reports what percentage of the frame survived. That number is a sanity check,
+not a quality score: very low means the matte collapsed, very high means it kept the
+background. Anything flagged **check source** hit one of those extremes.
+
+Cut-outs are cached, so re-opening a product is instant. Re-uploading an angle
+invalidates its cut-out automatically. **Re-run all** forces a rebuild if you have
+changed `REMBG_MODEL`.
+
+---
+
+## 4. Generate
 
 Click **Generate**. The processing view streams a live step log:
 
 ```
-  cut-out          removing background from 4 angles (BiRefNet)
-  scale calibration  earlobe ruler: 19 mm  →  4.71 px/mm
+  cut-out            removing background from 4 angles (BiRefNet)
+  scale calibration  earlobe ruler: 19 mm  ->  4.71 px/mm
   scene generation   3 scenes, seed 20260101
   compositing        placing 36 mm drop at 170 px
   realism pass       contact shadow + relight, SSIM 0.97 (pass)
-  formatting         7 assets × 7 formats = 49 exports
+  formatting         7 assets x 7 formats = 49 exports
 ```
 
 You also see running spend against the ₹100 cap and a **Cancel** button. If a call
@@ -85,7 +110,7 @@ would push you past the cap, generation stops and warns rather than continuing.
 
 ---
 
-## 4. Review results
+## 5. Review results
 
 Results are grouped by the seven asset types. Each shows every format variant with an
 individual download, plus **Download All (ZIP)**.
@@ -102,7 +127,7 @@ measured size. If a 36 mm earring reports 36 mm ±8%, the pipeline did its job.
 
 ---
 
-## 5. Campaign consistency
+## 6. Campaign consistency
 
 Settings → **Campaign style**.
 
@@ -112,7 +137,7 @@ products and your next ten won't look like the same shoot.
 
 ---
 
-## 6. Prompt library
+## 7. Prompt library
 
 Settings → **Prompts**. All seven templates are editable, with `{name}`, `{desc}`,
 `{dimensions}` and `{category}` auto-filled per product.
@@ -136,8 +161,16 @@ have no wheels there; it would fail deeper in with a much worse error.
 **Provider shows `dryrun` when you expected `gemini`** — `GOOGLE_API_KEY` is empty or
 invalid. The app falls back rather than crashing so the UI stays usable. Check `.env`.
 
-**Cut-out has ragged edges on a chain** — switch `REMBG_MODEL` to `birefnet-general`
-if you changed it, and re-shoot against a plain contrasting background.
+**First cut-out seems to hang** — it is downloading the BiRefNet model, ~970 MB.
+Progress appears in the backend console, not the UI. If it was interrupted, clear the
+partial file and re-run; the download does not resume:
+
+```powershell
+Remove-Item "$env:USERPROFILE\.u2net\tmp*" -Force
+```
+
+**Cut-out has ragged edges on a chain** — confirm `REMBG_MODEL=birefnet-general`
+(`u2netp` is much rougher), and re-shoot against a plain contrasting background.
 
 **Product looks the wrong size on the model** — check the dimensions you entered first;
 that's the cause nine times out of ten. If they're right, the landmark detector picked

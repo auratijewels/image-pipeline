@@ -35,6 +35,10 @@ data/
 # --- run.ps1 dependency-install stamps ---
 .stamps/
 
+# --- sample product photos (local testing only, never committed) ---
+samples/*
+!samples/README.md
+
 # --- os / editor ---
 .DS_Store
 Thumbs.db

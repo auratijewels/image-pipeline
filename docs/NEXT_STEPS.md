@@ -95,8 +95,11 @@ The first stage that touches real photographs.
 
 **Watch for**
 
-- First call downloads model weights (~200 MB) with no progress indication.
-  Surface that in the step log or it reads as a hang.
+- First call downloads model weights. birefnet-general is **~970 MB**, several
+  minutes on a normal connection, and rembg reports progress only to stderr —
+  from the API's side the call simply blocks. Surface it in the step log or it
+  reads as a hang. An interrupted download leaves a `tmp*` file in
+  `%USERPROFILE%\.u2net\` and does not resume; delete it and re-run.
 - `rembg` is synchronous and slow enough to block the event loop. Run it in a
   worker thread, not inline in the request handler.
 - Fine chains and prong settings are where mattes fail. That is the quality

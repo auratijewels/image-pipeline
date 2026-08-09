@@ -59,4 +59,10 @@ export const api = {
   deleteAngle: (id, angle) => req(`/products/${id}/angles/${angle}`, { method: 'DELETE' }),
   angleImageUrl: (id, angle, stamp) =>
     `${BASE}/products/${id}/angles/${angle}/raw${stamp ? `?v=${stamp}` : ''}`,
+
+  buildCutouts: (id, { force = false } = {}) =>
+    req(`/products/${id}/cutouts?force=${force}`, { method: 'POST' }),
+  listCutouts: (id) => req(`/products/${id}/cutouts`),
+  cutoutImageUrl: (id, angle, stamp) =>
+    `${BASE}/products/${id}/cutouts/${angle}/raw${stamp ? `?v=${stamp}` : ''}`,
 }
