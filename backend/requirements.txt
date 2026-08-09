@@ -1,0 +1,29 @@
+# Aurati Studio backend — requires Python 3.12 (see run.ps1).
+# mediapipe and onnxruntime do not publish wheels for 3.13/3.14.
+
+# --- web ---
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.32,<1.0
+python-multipart>=0.0.12
+pydantic>=2.9,<3.0
+pydantic-settings>=2.6,<3.0
+aiofiles>=24.1
+
+# --- imaging ---
+pillow>=11.0
+numpy>=1.26,<2.3
+opencv-python-headless>=4.10
+scikit-image>=0.24          # SSIM drift check (pipeline step E)
+
+# --- local ML utilities (no API cost) ---
+rembg>=2.0.60               # background removal, BiRefNet session
+onnxruntime>=1.19           # rembg runtime
+mediapipe>=0.10.18          # face + hand landmarks
+
+# --- providers ---
+google-genai>=1.0           # Gemini 2.5 Flash Image
+httpx>=0.27
+tenacity>=9.0               # retries with backoff
+
+# --- dev ---
+pytest>=8.3

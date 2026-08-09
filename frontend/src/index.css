@@ -1,0 +1,19 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-navy: #29354f;
+  --color-midnight: #161c2b;
+  --color-platinum: #eaedf3;
+  --color-navy-soft: #35435f;
+  --color-platinum-dim: #9aa3b5;
+
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--color-midnight);
+  color: var(--color-platinum);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}

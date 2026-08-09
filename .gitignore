@@ -1,0 +1,42 @@
+# --- secrets ---
+.env
+.env.local
+*.key
+
+# --- python ---
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- node ---
+node_modules/
+frontend/dist/
+.vite/
+npm-debug.log*
+
+# --- model weights (downloaded on first run) ---
+.u2net/
+models/weights/
+*.onnx
+*.tflite
+*.task
+
+# --- generated output ---
+outputs/
+uploads/
+data/
+*.zip
+
+# --- run.ps1 dependency-install stamps ---
+.stamps/
+
+# --- os / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
