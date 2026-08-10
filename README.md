@@ -214,4 +214,5 @@ run.ps1 / run.bat
 ## Documentation
 
 - [docs/USAGE.md](docs/USAGE.md) — step-by-step walkthrough
+- [docs/YOUR_TASKS.md](docs/YOUR_TASKS.md) — the manual steps only you can do, with verification for each
 - [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md) — build status, open blockers, what's next

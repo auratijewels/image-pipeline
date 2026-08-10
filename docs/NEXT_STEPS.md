@@ -1,13 +1,16 @@
 # Next steps
 
-Status as of Milestone 2. Two commits exist locally; neither is pushed.
+Status as of Milestone 3. Four commits exist locally; none are pushed.
+
+**Your manual tasks live in [YOUR_TASKS.md](YOUR_TASKS.md)** — this file is the
+engineering plan.
 
 | Milestone | State |
 |---|---|
 | 1 — Scaffold, provider interface, registries, run scripts | Done (`1864054`) |
 | 2 — Product model, dimensions form, five-angle upload | Done (`19bdb14`) |
-| 3 — Background removal + cut-out preview | Next |
-| 4 — Scale pipeline end to end for one product | Not started |
+| 3 — Background removal + cut-out preview | Done (`d6c0e97`), pending real-photo validation |
+| 4 — Scale pipeline end to end for one product | Next — needs a design decision, see below |
 | 5 — All 7 image asset types generating | Not started |
 | 6 — Format matrix export + ZIP download | Not started |
 | 7 — Consistency controls, cost logging, dry-run, error handling | Partly built |
@@ -17,97 +20,32 @@ Status as of Milestone 2. Two commits exist locally; neither is pushed.
 
 ## Blocked on you
 
-These are ordered by when they start costing time.
+Full instructions with verification steps: **[YOUR_TASKS.md](YOUR_TASKS.md)**.
 
-### 1. GitHub token cannot write (blocking the push)
+| # | Task | Blocks |
+|---|---|---|
+| 1 | Grant the GitHub PAT *Contents: Read and write* | Pushing 4 commits |
+| 2 | Put real product photos in `samples/` | Validating Milestone 3 |
+| 3 | `GOOGLE_API_KEY` in `.env` | Milestone 5 |
+| 4 | The Aurati_Gemini_Prompt_Kit | Milestone 5 |
+| 5 | Confirm 7 asset types vs 9 | Milestone 5 |
 
-The active `gh` token is a fine-grained PAT that resolves to the `auratijewels`
-account but has no write grant on this repo. Confirmed directly:
-
-```
-{"message":"Resource not accessible by personal access token","status":"403"}
-```
-
-Fix either way:
-
-- At <https://github.com/settings/personal-access-tokens>, edit the token, add
-  `auratijewels/image-pipeline` under *Repository access*, set *Repository
-  permissions → Contents* to **Read and write**. No re-auth needed afterwards.
-- Or mint an OAuth token instead: `gh auth login --hostname github.com --web`.
-
-Then:
-
-```powershell
-git push --force -u origin main
-```
-
-The force is deliberate — the remote holds one unrelated "Initial commit"
-containing a stub README that our README supersedes.
-
-Note the repo is currently **public**. §8 of the brief said private; you chose
-to leave it public. Flagged once here so the decision is on the record, not to
-reopen it.
-
-### 2. Real product photos (needed for Milestone 3)
-
-Background removal quality is the input to everything downstream, and synthetic
-test images prove nothing about how BiRefNet handles a fine chain against a
-busy background. Two or three real shots of any sample code (J292, E425, R383)
-would let Milestone 3 be validated rather than assumed.
-
-### 3. `GOOGLE_API_KEY` (needed for Milestone 5)
-
-Not blocking 3 or 4 — both run entirely on local models. Add it to `.env`
-before asset generation starts.
-
-### 4. The Aurati_Gemini_Prompt_Kit (needed for Milestone 5)
-
-`config/prompts.py` currently holds placeholders written from the brand rules
-in §7. The keys and `{name}/{desc}/{dimensions}/{category}` placeholders are the
-stable contract; only the `template` strings get replaced.
-
-### 5. Unresolved: 7 asset types or 9?
-
-§1 and the §2 heading say "9 asset types" and §7 says "the 9-prompt set", but
-§2 lists **7**. The registry has 7, on the assumption the other 2 were the video
-assets cut in §11. If the kit arrives with 9 image prompts, two entries get
-added to `core/assets.py`.
+Nothing on that list blocks Milestone 4 — it runs entirely on local models.
 
 ---
 
-## Milestone 3 — background removal + cut-out preview
+## Milestone 3 — done (`d6c0e97`)
 
-The first stage that touches real photographs.
+Cut-out via rembg/BiRefNet, cached against the source hash, trimmed to the
+product bounding box, previewed on a checkerboard in the UI.
 
-**Build**
+Verified against a synthetic image with a fine chain and a claw setting: every
+link survived individually and the hoop interior stayed transparent, so the
+pinhole-closing step correctly distinguished a real gap from a defect.
 
-- `pipeline/cutout.py` — wrap `rembg` with the `birefnet-general` session.
-  Load the session once at process start; it is expensive to construct and
-  re-creating it per call would dominate runtime.
-- Alpha post-processing: despeckle, close pinholes inside stones, and erode
-  the matte by a pixel to kill the light halo that background removal leaves
-  on polished metal.
-- Cache cut-outs to `data/cutouts/<product_id>/<angle>.png`, keyed on the
-  source file's hash so re-running is free but a re-upload invalidates.
-- `GET /api/products/{id}/cutouts/{angle}` plus a `POST .../cutouts` trigger.
-- UI: cut-out preview beside each uploaded angle, on a checkerboard so the
-  alpha channel is actually visible, with a re-run control.
-
-**Watch for**
-
-- First call downloads model weights. birefnet-general is **~970 MB**, several
-  minutes on a normal connection, and rembg reports progress only to stderr —
-  from the API's side the call simply blocks. Surface it in the step log or it
-  reads as a hang. An interrupted download leaves a `tmp*` file in
-  `%USERPROFILE%\.u2net\` and does not resume; delete it and re-run.
-- `rembg` is synchronous and slow enough to block the event loop. Run it in a
-  worker thread, not inline in the request handler.
-- Fine chains and prong settings are where mattes fail. That is the quality
-  bar, not the solid pendant body.
-
-**Done when** a real Aurati photo produces a transparent PNG with clean edges
-on a chain, cached, previewed in the UI, and covered by a test that asserts
-the output actually carries a non-trivial alpha channel.
+**Still open:** validation against real photographs. `test_cutout.py` runs the
+real model over anything in `samples/` and is skipped while that folder is
+empty — see task 2.
 
 ---
 
@@ -115,23 +53,79 @@ the output actually carries a non-trivial alpha channel.
 
 The reason the product exists. Everything before this is plumbing.
 
-- `pipeline/landmarks.py` — MediaPipe Face Landmarker (earlobe, neck) and Hand
-  Landmarker (finger, wrist). Return the anchor point *and* the measured span
-  in pixels.
-- `pipeline/scale.py` — pixels-per-mm from the measured span against the ruler
-  in `config/anatomy.py`; reject detections whose aspect falls outside the
-  ruler's `tolerance_pct` rather than silently scaling off a bad landmark.
-- `pipeline/composite.py` — resize the cut-out to `primary_mm × px_per_mm`,
-  rotate to the body part's axis, composite at the anchor, add a contact
-  shadow and colour-match to the scene.
-- Validation: measure the composited product back against the landmark and
-  assert it lands within the ±8% in `SCALE_ACCEPTANCE_PCT`. This is the §10
-  acceptance criterion and should fail loudly in CI, not be eyeballed.
+### Decide first: the ruler is wrong as specified
 
-**Sequencing note.** Build the composite against a *fixed* checked-in scene
-image first, so the scale maths is verified deterministically before Gemini is
-in the loop. Debugging measurement error and generation variance at the same
-time is much harder than doing them in order.
+`config/anatomy.py` currently calibrates on **earlobe height (19 mm)**, per §4
+step C of the brief. Two problems, both found while probing MediaPipe 1.0:
+
+1. **MediaPipe has no earlobe landmark.** Neither `FaceLandmarker` (478 points)
+   nor the removed FaceMesh exposes one. The face oval's outermost points sit at
+   the tragion, not the lobe. Any earlobe measurement would be inferred from
+   surrounding geometry — i.e. guessed.
+2. **Earlobe height varies ~15% across adults.** The §10 acceptance criterion is
+   **±8%**. Calibrating on a span whose own population variance is nearly double
+   the tolerance cannot meet that criterion, however good the detector is.
+
+**Proposed fix — separate the ruler from the anchor.** These are two different
+jobs and the brief conflates them:
+
+- **Calibration span** — something detected reliably with low population
+  variance, used *only* to derive pixels-per-mm.
+- **Mount anchor** — where the product is placed. Can be approximate; being a
+  few pixels off is a composition issue, not a scale error.
+
+Candidate calibration spans:
+
+| Mount | Span | mm | Variance | Landmarks |
+|---|---|---|---|---|
+| Ear, neck | Interpupillary distance | ~62 | ~4% | Very reliable |
+| Ear, neck | Bizygomatic (face) width | ~128 | ~5% | Reliable |
+| Finger, wrist | Palm width, index-to-pinky MCP | ~78 | ~5% | Reliable |
+
+Interpupillary distance is the strongest option for face-mounted pieces: it is
+the most reliably detected span on the face and has the lowest variance of any
+candidate. A 4% ruler leaves real headroom under an 8% budget; a 15% ruler
+leaves none.
+
+This keeps the §4 architecture exactly as specified — measure, derive px/mm,
+scale the real cut-out — and changes only *which* span is measured. Worth
+confirming before I write it, since it deviates from the brief's wording.
+
+### Then build
+
+- `pipeline/landmarks.py` — `FaceLandmarker` and `HandLandmarker` via the Tasks
+  API. Returns the calibration span in pixels *and* the mount anchor.
+- `pipeline/scale.py` — px/mm from the span against the ruler; reject
+  detections outside `tolerance_pct` rather than silently scaling off a bad
+  landmark. A wrong-but-confident measurement is worse than a refusal.
+- `pipeline/composite.py` — resize the cut-out to `primary_mm × px_per_mm`,
+  rotate to the body part's axis, composite at the anchor, contact shadow,
+  colour-match to the scene.
+- Validation: measure the composited product back and assert it lands within
+  `SCALE_ACCEPTANCE_PCT`. This is the §10 acceptance criterion and should fail
+  loudly in CI, not be eyeballed.
+
+### Setup step not in the brief
+
+**MediaPipe 1.0.0 removed the legacy `mp.solutions` API entirely and ships no
+bundled model files** (`has legacy solutions: False`, zero `.tflite`/`.task`
+assets in the package). Only the Tasks API remains, and each landmarker needs
+its `.task` bundle fetched separately:
+
+- `face_landmarker.task` — ~3.8 MB
+- `hand_landmarker.task` — ~7.5 MB
+
+Small, but they need downloading, caching under `models/weights/` (already
+git-ignored), and a first-run message so it does not look like a hang the way
+the 970 MB BiRefNet download did. Bundle this into `run.ps1` setup rather than
+leaving it to first use.
+
+### Sequencing
+
+Build the composite against a **fixed, checked-in scene image** before Gemini
+enters the loop. Scale error and generation variance are each tractable alone
+and miserable together — with both moving you cannot tell whether the landmark
+detector misread the ear or the model simply drew a different one.
 
 ---
 
@@ -169,6 +163,13 @@ retrofit:
 - **Python is pinned to 3.12.** `mediapipe` and `onnxruntime` ship no wheels
   for 3.13/3.14. `run.ps1` resolves 3.12 through the `py` launcher and refuses
   to build the venv otherwise.
+- **MediaPipe 1.0 dropped `mp.solutions`.** Every FaceMesh/Hands tutorial you
+  will find online uses that API and will not run. Use `mediapipe.tasks.python
+  .vision` instead, and download the `.task` bundles yourself — the package
+  contains no model assets.
+- **BiRefNet weights are ~970 MB**, cached in `%USERPROFILE%\.u2net\`. An
+  interrupted download does not resume and leaves a `tmp*` file behind; delete
+  it before retrying.
 - **FastAPI 0.141 nests included routes** under an `_IncludedRouter` object
   rather than flattening them into `app.routes`. Introspecting `app.routes`
   will wrongly suggest routers never registered — test over HTTP instead.
