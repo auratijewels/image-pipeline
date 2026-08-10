@@ -1,6 +1,6 @@
 # Next steps
 
-Status as of Milestone 3. Four commits exist locally; none are pushed.
+Status as of Milestone 4. Pushed to `auratijewels/image-pipeline`.
 
 **Your manual tasks live in [YOUR_TASKS.md](YOUR_TASKS.md)** — this file is the
 engineering plan.
@@ -10,8 +10,8 @@ engineering plan.
 | 1 — Scaffold, provider interface, registries, run scripts | Done (`1864054`) |
 | 2 — Product model, dimensions form, five-angle upload | Done (`19bdb14`) |
 | 3 — Background removal + cut-out preview | Done (`d6c0e97`), pending real-photo validation |
-| 4 — Scale pipeline end to end for one product | Next — needs a design decision, see below |
-| 5 — All 7 image asset types generating | Not started |
+| 4 — Scale pipeline end to end for one product | Done, pending a real generated scene |
+| 5 — All 7 image asset types generating | Next — needs `GOOGLE_API_KEY` |
 | 6 — Format matrix export + ZIP download | Not started |
 | 7 — Consistency controls, cost logging, dry-run, error handling | Partly built |
 | 8 — Polish, docs, final push | Not started |
@@ -49,13 +49,32 @@ empty — see task 2.
 
 ---
 
-## Milestone 4 — the scale pipeline
+## Milestone 4 — done
 
-The reason the product exists. Everything before this is plumbing.
+The reason the product exists. Built and verified deterministically:
 
-### Decide first: the ruler is wrong as specified
+- `config/anatomy.py` — calibration spans separated from mount anchors.
+- `pipeline/mp_assets.py` — downloads and caches the `.task` bundles.
+- `pipeline/landmarks.py` — face and hand readings that **reject rather than
+  guess** when the two rulers disagree or a face is too small to calibrate from.
+- `pipeline/scale.py` — pure millimetre arithmetic, no imagery.
+- `pipeline/composite.py` — scale, rotate, place, contact shadow, relight, then
+  measure the finished pixels back against the true size.
 
-`config/anatomy.py` currently calibrates on **earlobe height (19 mm)**, per §4
+**Proof:** a 36 mm earring cut-out composited at a pinned 5 px/mm measures
+exactly 180 px, +0.0% error. 110 tests pass, including the ±8% boundary at
+7.99% (pass) and 8.3% (fail), and scale invariance across cut-out resolutions
+from 60×200 to 300×1000.
+
+**Still open:** the landmark layer is verified against synthetic landmark sets,
+not a real generated scene — there was no face image to test against, and one
+should not be committed to a public repo. `test_landmarks.py` runs the real
+model over anything dropped in `samples/scenes/` and is skipped while that is
+empty. The first Gemini-generated scene in Milestone 5 closes this.
+
+### The design decision taken here
+
+`config/anatomy.py` originally calibrated on **earlobe height (19 mm)**, per §4
 step C of the brief. Two problems, both found while probing MediaPipe 1.0:
 
 1. **MediaPipe has no earlobe landmark.** Neither `FaceLandmarker` (478 points)
@@ -66,44 +85,40 @@ step C of the brief. Two problems, both found while probing MediaPipe 1.0:
    **±8%**. Calibrating on a span whose own population variance is nearly double
    the tolerance cannot meet that criterion, however good the detector is.
 
-**Proposed fix — separate the ruler from the anchor.** These are two different
-jobs and the brief conflates them:
+**Fix, agreed 2026-08-10 — separate the ruler from the anchor.** These are two
+different jobs and the brief conflates them:
 
 - **Calibration span** — something detected reliably with low population
   variance, used *only* to derive pixels-per-mm.
 - **Mount anchor** — where the product is placed. Can be approximate; being a
   few pixels off is a composition issue, not a scale error.
 
-Candidate calibration spans:
+Spans in use:
 
-| Mount | Span | mm | Variance | Landmarks |
+| Detector | Role | Span | mm | Variance |
 |---|---|---|---|---|
-| Ear, neck | Interpupillary distance | ~62 | ~4% | Very reliable |
-| Ear, neck | Bizygomatic (face) width | ~128 | ~5% | Reliable |
-| Finger, wrist | Palm width, index-to-pinky MCP | ~78 | ~5% | Reliable |
+| Face | primary | Interpupillary distance | 62 | ~4% |
+| Face | cross-check | Bizygomatic width | 128 | ~5% |
+| Hand | primary | Palm width, index-to-pinky MCP | 78 | ~5% |
 
-Interpupillary distance is the strongest option for face-mounted pieces: it is
-the most reliably detected span on the face and has the lowest variance of any
-candidate. A 4% ruler leaves real headroom under an 8% budget; a 15% ruler
-leaves none.
+Interpupillary distance is the primary ruler for face-mounted pieces: the most
+reliably detected span on the face, and at ~4% it leaves real headroom under an
+8% budget where a 15% ruler leaves none. Face width is measured independently;
+when the two disagree by more than 12% the detection is untrustworthy (head
+turned too far, partial occlusion) and the shot is **rejected** rather than
+silently mis-scaled.
+
+The hand has no cross-check on purpose — every candidate second span shares the
+same MCP landmarks, so agreement would be circular and prove nothing. This is
+asserted in the tests so nobody "fixes" it later.
+
+The brief's 19 mm earlobe figure survives as a *diagnostic*: the generated
+model's ear region is inferred from the IPD-derived scale and warns when
+anatomically implausible, catching a malformed generation without letting it
+drive scale.
 
 This keeps the §4 architecture exactly as specified — measure, derive px/mm,
-scale the real cut-out — and changes only *which* span is measured. Worth
-confirming before I write it, since it deviates from the brief's wording.
-
-### Then build
-
-- `pipeline/landmarks.py` — `FaceLandmarker` and `HandLandmarker` via the Tasks
-  API. Returns the calibration span in pixels *and* the mount anchor.
-- `pipeline/scale.py` — px/mm from the span against the ruler; reject
-  detections outside `tolerance_pct` rather than silently scaling off a bad
-  landmark. A wrong-but-confident measurement is worse than a refusal.
-- `pipeline/composite.py` — resize the cut-out to `primary_mm × px_per_mm`,
-  rotate to the body part's axis, composite at the anchor, contact shadow,
-  colour-match to the scene.
-- Validation: measure the composited product back and assert it lands within
-  `SCALE_ACCEPTANCE_PCT`. This is the §10 acceptance criterion and should fail
-  loudly in CI, not be eyeballed.
+scale the real cut-out — and changes only *which* span is measured.
 
 ### Setup step not in the brief
 
@@ -115,17 +130,14 @@ its `.task` bundle fetched separately:
 - `face_landmarker.task` — ~3.8 MB
 - `hand_landmarker.task` — ~7.5 MB
 
-Small, but they need downloading, caching under `models/weights/` (already
-git-ignored), and a first-run message so it does not look like a hang the way
-the 970 MB BiRefNet download did. Bundle this into `run.ps1` setup rather than
-leaving it to first use.
+Handled by `pipeline/mp_assets.py`: downloads on first use, caches under
+`models/weights/` (git-ignored), writes to a `.partial` file and swaps
+atomically so an interrupted run cannot leave a truncated bundle that fails
+opaquely inside MediaPipe. Measured sizes match the estimates — 3.76 MB and
+7.82 MB.
 
-### Sequencing
-
-Build the composite against a **fixed, checked-in scene image** before Gemini
-enters the loop. Scale error and generation variance are each tractable alone
-and miserable together — with both moving you cannot tell whether the landmark
-detector misread the ear or the model simply drew a different one.
+**Outstanding:** move this into `run.ps1` setup so it happens alongside the
+dependency install rather than on first use.
 
 ---
 
@@ -134,7 +146,8 @@ detector misread the ear or the model simply drew a different one.
 - **5** — Wire the 7 asset types through the orchestrator. DIRECT types go
   straight from cut-out to Gemini; COMPOSITE types run steps B–E. Live progress
   over SSE. This is where spend starts, so the cap in `core/costs.py` gets its
-  first real exercise.
+  first real exercise. The first generated scene also closes the outstanding
+  landmark validation — save one into `samples/scenes/` when it appears.
 - **6** — Smart-crop export across the 7-format matrix and ZIP packaging.
   Subject-aware cropping matters most for 1.91:1 Facebook, where a centre crop
   of a 4:5 portrait decapitates the model.

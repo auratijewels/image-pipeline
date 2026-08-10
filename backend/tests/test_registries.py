@@ -5,7 +5,13 @@ from __future__ import annotations
 import pytest
 
 from app.config import prompts as P
-from app.config.anatomy import CATEGORY_MOUNT, RULERS, ruler_for_category
+from app.config.anatomy import (
+    CATEGORY_MOUNT,
+    MOUNT_DETECTOR,
+    PRIMARY_SPAN,
+    detector_for_category,
+    primary_span_for_category,
+)
 from app.core.assets import ASSET_TYPES, ASSET_TYPES_BY_KEY, Pipeline
 from app.core.formats import FORMATS, FORMATS_BY_KEY, MASTER_LONG_EDGE
 
@@ -35,8 +41,27 @@ def test_format_matrix_matches_spec():
 
 def test_every_category_maps_to_a_ruler():
     for category, mount in CATEGORY_MOUNT.items():
-        assert mount in RULERS
-        assert ruler_for_category(category).mm > 0
+        assert mount in MOUNT_DETECTOR
+        span = primary_span_for_category(category)
+        assert span.mm > 0
+        assert span.detector is detector_for_category(category)
+
+
+def test_every_detector_has_a_primary_span():
+    for detector in set(MOUNT_DETECTOR.values()):
+        assert detector in PRIMARY_SPAN
+
+
+def test_calibration_rulers_are_precise_enough_for_the_acceptance_target():
+    """A ruler whose population variance exceeds the tolerance can never meet
+    it — this is exactly why the brief's earlobe ruler was replaced."""
+    from app.config.anatomy import SCALE_ACCEPTANCE_PCT
+
+    for detector, span in PRIMARY_SPAN.items():
+        assert span.variance_pct < SCALE_ACCEPTANCE_PCT, (
+            f"{span.key} varies {span.variance_pct}% against a "
+            f"±{SCALE_ACCEPTANCE_PCT}% target ({detector})"
+        )
 
 
 @pytest.mark.parametrize("key", sorted(P.PROMPTS))

@@ -6,7 +6,14 @@ from dataclasses import asdict
 
 from fastapi import APIRouter
 
-from app.config.anatomy import CATEGORY_MOUNT, RULERS, SCALE_ACCEPTANCE_PCT
+from app.config.anatomy import (
+    CATEGORY_MOUNT,
+    CROSSCHECK_SPAN,
+    CROSSCHECK_TOLERANCE_PCT,
+    MOUNT_DETECTOR,
+    PRIMARY_SPAN,
+    SCALE_ACCEPTANCE_PCT,
+)
 from app.config.dimensions import CATEGORIES, CATEGORY_DIMENSIONS
 from app.core.assets import ASSET_TYPES
 from app.core.costs import get_ledger
@@ -54,10 +61,20 @@ def formats() -> list[dict]:
 
 @router.get("/anatomy")
 def anatomy() -> dict:
+    """The rulers scale is derived from, and the tolerances applied to them."""
+
+    def span(s) -> dict:
+        return asdict(s) | {"detector": s.detector.value}
+
     return {
-        "rulers": {k.value: asdict(v) | {"mount": v.mount.value} for k, v in RULERS.items()},
+        "primary_spans": {d.value: span(s) for d, s in PRIMARY_SPAN.items()},
+        "crosscheck_spans": {
+            d.value: (span(s) if s else None) for d, s in CROSSCHECK_SPAN.items()
+        },
         "category_mount": {k: v.value for k, v in CATEGORY_MOUNT.items()},
+        "mount_detector": {m.value: d.value for m, d in MOUNT_DETECTOR.items()},
         "acceptance_pct": SCALE_ACCEPTANCE_PCT,
+        "crosscheck_tolerance_pct": CROSSCHECK_TOLERANCE_PCT,
     }
 
 
