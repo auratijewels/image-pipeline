@@ -1,6 +1,6 @@
 # Next steps
 
-Status as of Milestone 4. Pushed to `auratijewels/image-pipeline`.
+Status as of Milestone 5. Pushed to `auratijewels/image-pipeline`.
 
 **Your manual tasks live in [YOUR_TASKS.md](YOUR_TASKS.md)** — this file is the
 engineering plan.
@@ -11,9 +11,9 @@ engineering plan.
 | 2 — Product model, dimensions form, five-angle upload | Done (`19bdb14`) |
 | 3 — Background removal + cut-out preview | Done (`d6c0e97`), pending real-photo validation |
 | 4 — Scale pipeline end to end for one product | Done, pending a real generated scene |
-| 5 — All 7 image asset types generating | Next — needs `GOOGLE_API_KEY` |
-| 6 — Format matrix export + ZIP download | Not started |
-| 7 — Consistency controls, cost logging, dry-run, error handling | Partly built |
+| 5 — All 7 image asset types generating | Done in dry-run; needs `GOOGLE_API_KEY` for a live run |
+| 6 — Format matrix export + ZIP download | Next — needs nothing from you |
+| 7 — Consistency controls, cost logging, dry-run, error handling | Mostly built |
 | 8 — Polish, docs, final push | Not started |
 
 ---
@@ -143,11 +143,13 @@ dependency install rather than on first use.
 
 ## Milestones 5–8, in brief
 
-- **5** — Wire the 7 asset types through the orchestrator. DIRECT types go
-  straight from cut-out to Gemini; COMPOSITE types run steps B–E. Live progress
-  over SSE. This is where spend starts, so the cap in `core/costs.py` gets its
-  first real exercise. The first generated scene also closes the outstanding
-  landmark validation — save one into `samples/scenes/` when it appears.
+- **5** — Done. All 7 assets generate, progress streams over SSE, per-asset
+  scale checks are recorded, and one failed asset no longer costs the other six.
+  Verified end to end in the browser in dry-run: 7/7 generated, both
+  scale-critical assets measuring 36.0 mm at +0.0%, ₹0 spent, no console errors.
+  A **live** run still needs `GOOGLE_API_KEY` — and the first real generated
+  scene closes the outstanding landmark validation, so save one into
+  `samples/scenes/` when it appears.
 - **6** — Smart-crop export across the 7-format matrix and ZIP packaging.
   Subject-aware cropping matters most for 1.91:1 Facebook, where a centre crop
   of a 4:5 portrait decapitates the model.
@@ -176,6 +178,14 @@ retrofit:
 - **Python is pinned to 3.12.** `mediapipe` and `onnxruntime` ship no wheels
   for 3.13/3.14. `run.ps1` resolves 3.12 through the `py` launcher and refuses
   to build the venv otherwise.
+- **`asyncio.create_task` needs a strong reference.** asyncio keeps only a weak
+  reference, so a fire-and-forget background task can be garbage collected
+  mid-run and stall with no error anywhere. Jobs own their task; the registry
+  owns the job.
+- **`TestClient` must be a context manager** for anything involving background
+  tasks. Otherwise Starlette tears down the event loop after each request and
+  the task started by `POST /generate` is orphaned the instant the response
+  returns.
 - **MediaPipe 1.0 dropped `mp.solutions`.** Every FaceMesh/Hands tutorial you
   will find online uses that API and will not run. Use `mediapipe.tasks.python
   .vision` instead, and download the `.task` bundles yourself — the package
