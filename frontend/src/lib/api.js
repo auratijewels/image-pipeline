@@ -65,4 +65,13 @@ export const api = {
   listCutouts: (id) => req(`/products/${id}/cutouts`),
   cutoutImageUrl: (id, angle, stamp) =>
     `${BASE}/products/${id}/cutouts/${angle}/raw${stamp ? `?v=${stamp}` : ''}`,
+
+  generate: (id, assetKeys = []) =>
+    req(`/products/${id}/generate`, json('POST', { asset_keys: assetKeys })),
+  getJob: (jobId) => req(`/jobs/${jobId}`),
+  cancelJob: (jobId) => req(`/jobs/${jobId}/cancel`, { method: 'POST' }),
+  jobEventsUrl: (jobId) => `${BASE}/jobs/${jobId}/events`,
+  listGeneratedAssets: (id) => req(`/products/${id}/assets`),
+  assetImageUrl: (id, assetKey, stamp) =>
+    `${BASE}/products/${id}/assets/${assetKey}/raw${stamp ? `?v=${stamp}` : ''}`,
 }

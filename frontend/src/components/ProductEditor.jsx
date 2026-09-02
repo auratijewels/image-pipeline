@@ -3,6 +3,7 @@ import { api } from '../lib/api.js'
 import AngleSlots from './AngleSlots.jsx'
 import CutoutPanel from './CutoutPanel.jsx'
 import DimensionFields from './DimensionFields.jsx'
+import GeneratePanel from './GeneratePanel.jsx'
 import { Button, ErrorNote, Field, Input, Panel, Select, Textarea } from './ui.jsx'
 
 const BLANK = {
@@ -19,6 +20,7 @@ export default function ProductEditor({ productId, onDone, onCancel }) {
   const [form, setForm] = useState(BLANK)
   const [product, setProduct] = useState(null)
   const [staged, setStaged] = useState({})
+  const [assetTypes, setAssetTypes] = useState([])
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
 
@@ -30,6 +32,7 @@ export default function ProductEditor({ productId, onDone, onCancel }) {
 
   useEffect(() => {
     api.categories().then(setCategories).catch((e) => setError(e.message))
+    api.assetTypes().then(setAssetTypes).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -193,6 +196,8 @@ export default function ProductEditor({ productId, onDone, onCancel }) {
       </Panel>
 
       <CutoutPanel product={product} />
+
+      {assetTypes.length > 0 && <GeneratePanel product={product} assetTypes={assetTypes} />}
 
       {blockers.length > 0 && (
         <div className="rounded border border-amber-400/40 bg-amber-950/25 px-4 py-3 text-sm text-amber-200">

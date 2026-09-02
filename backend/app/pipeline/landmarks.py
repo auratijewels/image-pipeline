@@ -17,6 +17,7 @@ Two things this module deliberately does *not* do:
 
 from __future__ import annotations
 
+import atexit
 import logging
 import math
 import threading
@@ -134,8 +135,24 @@ def _get_landmarker(kind: str):
         return lm
 
 
-def reset_landmarkers() -> None:
+def close_landmarkers() -> None:
+    for lm in _landmarkers.values():
+        try:
+            lm.close()
+        except Exception:  # noqa: BLE001 — teardown must not raise
+            pass
     _landmarkers.clear()
+
+
+def reset_landmarkers() -> None:
+    close_landmarkers()
+
+
+# MediaPipe's own __del__ runs during interpreter shutdown, by which point the
+# module globals it depends on are already None — it raises a confusing
+# "TypeError: 'NoneType' object is not callable" that reads like a real failure.
+# Closing them at exit, while the interpreter is still intact, avoids that.
+atexit.register(close_landmarkers)
 
 
 def _as_mp_image(image: np.ndarray):
@@ -325,6 +342,29 @@ def read_hand(image: np.ndarray, mount: MountPoint) -> LandmarkReading:
 
 
 # --- entry point ------------------------------------------------------------
+
+
+def synthetic_reading(size: tuple[int, int], mount: MountPoint, px_per_mm: float = 5.0) -> LandmarkReading:
+    """A pinned reading for dry-run mode.
+
+    Dry-run placeholders contain no face, so real detection cannot run — but the
+    composite path is exactly what dry-run exists to exercise. This substitutes
+    a known calibration so the whole pipeline, including the §10 scale check,
+    runs end to end at zero API cost. Never used when a real provider is active.
+    """
+    from app.config.anatomy import MOUNT_DETECTOR
+
+    width, height = size
+    detector = MOUNT_DETECTOR[mount]
+    span = PRIMARY_SPAN[detector]
+    return LandmarkReading(
+        detector=detector,
+        mount=mount,
+        primary=Measurement(span, span.mm * px_per_mm),
+        anchor=(width * 0.5, height * 0.38),
+        axis_deg=0.0,
+        diagnostics={"synthetic": True, "reason": "dry-run mode: no real face to detect"},
+    )
 
 
 def read(image: np.ndarray | Path | str, mount: MountPoint) -> LandmarkReading:

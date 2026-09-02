@@ -77,34 +77,6 @@ def test_trim_rejects_an_empty_matte():
 # --- caching and orchestration (rembg stubbed) ------------------------------
 
 
-@pytest.fixture
-def stub_rembg(monkeypatch, tmp_path):
-    """Replace rembg.remove with a deterministic fake, and count invocations."""
-    calls = {"n": 0}
-
-    def fake_remove(data, session=None):
-        """Keep a centred quarter of the frame.
-
-        Roughly what a real product photo yields — the earlier version kept 96%
-        of the frame, which is indistinguishable from a matte that failed to
-        remove the background at all.
-        """
-        calls["n"] += 1
-        with Image.open(io.BytesIO(data)) as src:
-            h, w = src.height, src.width
-        arr = np.zeros((h, w, 4), dtype=np.uint8)
-        arr[h // 4 : 3 * h // 4, w // 4 : 3 * w // 4] = [180, 150, 90, 255]
-        buf = io.BytesIO()
-        Image.fromarray(arr, mode="RGBA").save(buf, format="PNG")
-        return buf.getvalue()
-
-    import rembg
-
-    monkeypatch.setattr(rembg, "remove", fake_remove)
-    monkeypatch.setattr(C, "get_session", lambda: object())
-    return calls
-
-
 def source_image(tmp_path: Path, name="front.jpg", size=(600, 600)) -> Path:
     path = tmp_path / name
     Image.new("RGB", size, (210, 200, 180)).save(path)

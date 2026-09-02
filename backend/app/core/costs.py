@@ -84,10 +84,14 @@ class CostLedger:
         return sum(e.inr for e in self.entries() if not e.dry_run)
 
     def check_budget(self, product_id: str, next_call_usd: float) -> None:
-        """Raise before spending, not after — the cap is a stop, not a report."""
+        """Raise before spending, not after — the cap is a stop, not a report.
+
+        No dry-run special case is needed: dry-run entries are excluded from
+        `spent_inr` and cost nothing, so the arithmetic naturally never trips.
+        Branching on settings here was actively wrong, because the provider can
+        fall back to dry-run while settings still name a paid provider.
+        """
         s = get_settings()
-        if s.is_dry_run:
-            return
         spent = self.spent_inr(product_id)
         next_inr = next_call_usd * s.usd_to_inr
         if spent + next_inr > s.budget_cap_inr_per_product:
